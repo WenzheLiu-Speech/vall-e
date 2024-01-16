@@ -1,5 +1,181 @@
 非官方 VALL-E（[Neural Codec Language Models are Zero-Shot Text to Speech Synthesizers](https://arxiv.org/abs/2301.02111)）开源 PyTorch 实现。
 
 <a href="https://www.buymeacoffee.com/feiteng" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 40px !important;width: 145px !important;" ></a>
+![model](./docs/images/Overview.jpg)
 
-未同步更新，移步英文版[🇺🇸](./README.md)
+我们可以单卡训练vall-e
+## Demo
+
+* [official demo](https://valle-demo.github.io/)
+* [reproduced demo](https://lifeiteng.github.io/valle/index.html)
+
+<a href="https://www.buymeacoffee.com/feiteng" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 40px !important;width: 145px !important;" ></a>
+
+<img src="./docs/images/vallf.png" width="500" height="400">
+
+
+## 安装用于开发
+
+按照下面的步骤运行:
+
+```
+python == 3.10
+# PyTorch
+pip install torch==1.13.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu116
+pip install torchmetrics==0.11.1
+# fbank
+pip install librosa==0.8.1
+
+# phonemizer pypinyin
+apt-get install espeak-ng
+## OSX: brew install espeak
+pip install phonemizer==3.2.1 pypinyin==0.48.0
+
+# lhotse update to newest version
+# https://github.com/lhotse-speech/lhotse/pull/956
+# https://github.com/lhotse-speech/lhotse/pull/960
+pip uninstall lhotse
+pip uninstall lhotse
+pip install git+https://github.com/lhotse-speech/lhotse
+
+# k2
+# find the right version in https://huggingface.co/csukuangfj/k2
+pip install https://huggingface.co/csukuangfj/k2/resolve/main/cuda/k2-1.23.4.dev20230224+cuda11.6.torch1.13.1-cp310-cp310-linux_x86_64.whl
+if you have bug when prepare.sh stage 2, raise error about k2 version problem, unistall and re-install correct cuda version k2
+# icefall
+git clone https://github.com/k2-fsa/icefall
+cd icefall
+pip install -r requirements.txt
+export PYTHONPATH=`pwd`/../icefall:$PYTHONPATH
+echo "export PYTHONPATH=`pwd`/../icefall:\$PYTHONPATH" >> ~/.zshrc
+echo "export PYTHONPATH=`pwd`/../icefall:\$PYTHONPATH" >> ~/.bashrc
+cd -
+source ~/.zshrc
+
+# valle
+git clone https://github.com/lifeiteng/valle.git
+cd valle
+pip install -e .
+
+# other requirements
+pip install h5py
+pip install matplot
+pip install numpy==1.22 # 删除高版本numpy
+[maybe] cp anaconda_env/lib/libpython-3.10.so.1  /usr/lib
+```
+
+
+## 训练和推理
+* #### 英文例子 [examples/libritts/README.md](egs/libritts/README.md)
+* #### 中文例子 [examples/aishell1/README.md](egs/aishell1/README.md)
+
+#### [LibriTTS demo](https://lifeiteng.github.io/valle/index.html) 用24G存储的单张GPU训练
+
+```
+cd examples/libritts
+
+# step1 prepare dataset
+vim prepare.sh
+修改50行： dl_dir=放libritts的路径
+
+bash prepare.sh --stage -1 --stop-stage 3
+
+# step2 train the model on one GPU with 24GB memory
+exp_dir=exp/valle
+
+## Train AR model
+python3 bin/trainer.py --max-duration 80 --filter-min-duration 0.5 --filter-max-duration 14 --train-stage 1 \
+      --num-buckets 6 --dtype "bfloat16" --save-every-n 10000 --valid-interval 20000 \
+      --model-name valle --share-embedding true --norm-first true --add-prenet false \
+      --decoder-dim 1024 --nhead 16 --num-decoder-layers 12 --prefix-mode 1 \
+      --base-lr 0.05 --warmup-steps 200 --average-period 0 \
+      --num-epochs 20 --start-epoch 1 --start-batch 0 --accumulate-grad-steps 4 \
+      --exp-dir ${exp_dir}
+
+## Train NAR model
+cp ${exp_dir}/best-valid-loss.pt ${exp_dir}/epoch-2.pt  # --start-epoch 3=2+1
+python3 bin/trainer.py --max-duration 40 --filter-min-duration 0.5 --filter-max-duration 14 --train-stage 2 \
+      --num-buckets 6 --dtype "float32" --save-every-n 10000 --valid-interval 20000 \
+      --model-name valle --share-embedding true --norm-first true --add-prenet false \
+      --decoder-dim 1024 --nhead 16 --num-decoder-layers 12 --prefix-mode 1 \
+      --base-lr 0.05 --warmup-steps 200 --average-period 0 \
+      --num-epochs 40 --start-epoch 3 --start-batch 0 --accumulate-grad-steps 4 \
+      --exp-dir ${exp_dir}
+
+# step3 inference
+python3 bin/infer.py --output-dir infer/demos \
+    --checkpoint=${exp_dir}/best-valid-loss.pt \
+    --text-prompts "KNOT one point one five miles per hour." \
+    --audio-prompts ./prompts/8463_294825_000043_000000.wav \
+    --text "To get up and running quickly just follow the steps below." \
+
+# Demo Inference
+https://github.com/lifeiteng/lifeiteng.github.com/blob/main/valle/run.sh#L68
+```
+
+* ### NAR Decoder 的 0 1 2 4  Prefix Mode
+  **论文5.1节** "The average length of the waveform in LibriLight is 60 seconds. During
+training, we randomly crop the waveform to a random length between 10 seconds and 20 seconds. For the NAR acoustic prompt tokens, we select a random segment waveform of 3 seconds from the same utterance."
+  * **0**: 没有声学prompt tokens (no acoustic prompt tokens)
+  * **1**: 当前batch语料的随机prefix (推荐) (random prefix of current batched utterances **(This is recommended)**)
+  * **2**: 当前batch语料的随机切片 (random segment of current batched utterances)
+  * **4**: 和论文一致 (same as the paper (As they randomly crop the long waveform to multiple utterances, so the same utterance means pre or post utterance in the same long waveform.))
+    ```
+    # 用法 加入用模式4（上面libritts的例子用的是模式1）：
+    python3 bin/trainer.py --prefix_mode 4 --dataset libritts --input-strategy PromptedPrecomputedFeatures ...
+    ```
+![train](./docs/images/train.png)
+
+#### Troubleshooting
+
+* **SummaryWriter segmentation fault (core dumped)**
+   * LINE `tb_writer = SummaryWriter(log_dir=f"{params.exp_dir}/tensorboard")`
+   * FIX  [https://github.com/tensorflow/tensorboard/pull/6135/files](https://github.com/tensorflow/tensorboard/pull/6135/files)
+   ```
+   file=`python  -c 'import site; print(f"{site.getsitepackages()[0]}/tensorboard/summary/writer/event_file_writer.py")'`
+   sed -i 's/import tf/import tensorflow_stub as tf/g' $file
+   ```
+
+#### Training on a custom dataset?
+* prepare the dataset to `lhotse manifests`
+  * There are plenty of references here [lhotse/recipes](https://github.com/lhotse-speech/lhotse/tree/master/lhotse/recipes)
+* `python3 bin/tokenizer.py ...`
+* `python3 bin/trainer.py ...`
+
+## Contributing
+
+* Parallelize bin/tokenizer.py on multi-GPUs
+* <a href="https://www.buymeacoffee.com/feiteng" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-blue.png" alt="Buy Me A Coffee" style="height: 40px !important;width: 145px !important;" ></a>
+
+## Citing
+
+To cite this repository:
+
+```bibtex
+@misc{valle,
+  author={Feiteng Li},
+  title={VALL-E: A neural codec language model},
+  year={2023},
+  url={http://github.com/lifeiteng/vall-e}
+}
+```
+
+```bibtex
+@article{VALL-E,
+  title     = {Neural Codec Language Models are Zero-Shot Text to Speech Synthesizers},
+  author    = {Chengyi Wang, Sanyuan Chen, Yu Wu,
+               Ziqiang Zhang, Long Zhou, Shujie Liu,
+               Zhuo Chen, Yanqing Liu, Huaming Wang,
+               Jinyu Li, Lei He, Sheng Zhao, Furu Wei},
+  year      = {2023},
+  eprint    = {2301.02111},
+  archivePrefix = {arXiv},
+  volume    = {abs/2301.02111},
+  url       = {http://arxiv.org/abs/2301.02111},
+}
+```
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=lifeiteng/vall-e&type=Date)](https://star-history.com/#lifeiteng/vall-e&Date)
+

@@ -63,6 +63,12 @@ source ~/.zshrc
 git clone https://github.com/lifeiteng/valle.git
 cd valle
 pip install -e .
+
+# other requirements
+pip install h5py
+pip install matplot
+pip install numpy==1.22 # 删除高版本numpy
+[maybe] cp anaconda_env/lib/libpython-3.10.so.1  /usr/lib
 ```
 
 

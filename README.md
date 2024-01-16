@@ -27,6 +27,7 @@ To avoid abuse, Well-trained models and services will not be provided.
 To get up and running quickly just follow the steps below:
 
 ```
+python == 3.10
 # PyTorch
 pip install torch==1.13.1 torchaudio==0.13.1 --extra-index-url https://download.pytorch.org/whl/cu116
 pip install torchmetrics==0.11.1
@@ -48,7 +49,7 @@ pip install git+https://github.com/lhotse-speech/lhotse
 # k2
 # find the right version in https://huggingface.co/csukuangfj/k2
 pip install https://huggingface.co/csukuangfj/k2/resolve/main/cuda/k2-1.23.4.dev20230224+cuda11.6.torch1.13.1-cp310-cp310-linux_x86_64.whl
-
+if you have bug when prepare.sh stage 2, raise error about k2 version problem, unistall and re-install correct cuda version k2
 # icefall
 git clone https://github.com/k2-fsa/icefall
 cd icefall

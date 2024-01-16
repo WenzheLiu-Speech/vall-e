@@ -94,6 +94,9 @@ training, we randomly crop the waveform to a random length between 10 seconds an
 cd examples/libritts
 
 # step1 prepare dataset
+vim prepare.sh
+修改50行： dl_dir=放libritts的路径
+
 bash prepare.sh --stage -1 --stop-stage 3
 
 # step2 train the model on one GPU with 24GB memory

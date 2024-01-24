@@ -62,6 +62,7 @@ pip install h5py==3.10.0
 pip install matplot==3.8.2
 pip install numpy==1.22 # 删除高版本numpy
 [maybe] cp anaconda_env/lib/libpython-3.10.so.1  /usr/lib
+[maybe] pip install scipy==1.11.4
 ```
 
 

@@ -85,7 +85,7 @@ bash prepare.sh --stage -1 --stop-stage 3
 exp_dir=exp/valle
 
 ## Train AR model
-python3 bin/trainer.py --max-duration 80 --filter-min-duration 0.5 --filter-max-duration 14 --train-stage 1 --num-buckets 6 --dtype "float16" --save-every-n 10000 --valid-interval 20000 --model-name valle --share-embedding true --norm-first true --add-prenet false --decoder-dim 1024 --nhead 16 --num-decoder-layers 12 --prefix-mode 1 --base-lr 0.05 --warmup-steps 200 --average-period 0 --num-epochs 20 --start-epoch 1 --start-batch 0 --accumulate-grad-steps 4  --exp-dir exp/valle > ../../log_valle_stage1.txt
+python3 bin/trainer.py --world-size 8 --max-duration 80 --filter-min-duration 0.5 --filter-max-duration 14 --train-stage 1 --num-buckets 6 --dtype "float16" --save-every-n 10000 --valid-interval 20000 --model-name valle --share-embedding true --norm-first true --add-prenet false --decoder-dim 1024 --nhead 16 --num-decoder-layers 12 --prefix-mode 1 --base-lr 0.05 --warmup-steps 200 --average-period 0 --num-epochs 20 --start-epoch 1 --start-batch 0 --accumulate-grad-steps 4  --exp-dir exp/valle > ../../log_valle_stage1.txt
 
 * 报错显卡不支持bfloat16时将dtype参数改成float16, 否则用bfloat16
 * 修改bin/trainer.py的world_size=num_gpu，否则单卡训练
@@ -100,7 +100,7 @@ python3 bin/trainer.py --max-duration 80 --filter-min-duration 0.5 --filter-max-
 
 ## Train NAR model
 cp exp/valle/best-valid-loss.pt exp/valle_nar/epoch-2.pt  # --start-epoch 3=2+1
-python3 bin/trainer.py --max-duration 40 --filter-min-duration 0.5 --filter-max-duration 14 --train-stage 2 \
+python3 bin/trainer.py --world-size 8 --max-duration 40 --filter-min-duration 0.5 --filter-max-duration 14 --train-stage 2 \
       --num-buckets 6 --dtype "float32" --save-every-n 10000 --valid-interval 20000 \
       --model-name valle --share-embedding true --norm-first true --add-prenet false \
       --decoder-dim 1024 --nhead 16 --num-decoder-layers 12 --prefix-mode 1 \
